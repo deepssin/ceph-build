@@ -140,20 +140,28 @@ pipeline {
     stage("source distribution") {
       steps {
         script {
-          if ( ! env.SETUP_BUILD_ID ) {
-            def setup_build = build(
-              job: env.SETUP_JOB,
-              parameters: [
-                string(name: "BRANCH", value: env.BRANCH),
-                string(name: "FLAVOR", value: env.FLAVOR),
-                string(name: "SCCACHE", value: env.SCCACHE),
-                string(name: "DWZ", value: env.DWZ),
-                // Below are just for ceph-source-dist
-                string(name: "CEPH_REPO", value: env.CEPH_REPO),
-                string(name: "CEPH_BUILD_BRANCH", value: env.CEPH_BUILD_BRANCH),
-              ]
-            )
-            env.SETUP_BUILD_ID = setup_build.getNumber()
+          if (!env.SETUP_BUILD_ID) {
+            def last_successful_build_id = sh(
+              script: "curl -s ${env.JENKINS_URL}job/${env.SETUP_JOB}/lastSuccessfulBuild/buildNumber",
+              returnStdout: true,
+            ).trim()
+            if (!last_successful_build_id) {
+              def setup_build = build(
+                job: env.SETUP_JOB,
+                parameters: [
+                  string(name: "BRANCH", value: env.BRANCH),
+                  string(name: "FLAVOR", value: env.FLAVOR),
+                  string(name: "SCCACHE", value: env.SCCACHE),
+                  string(name: "DWZ", value: env.DWZ),
+                  // Below are just for ceph-source-dist
+                  string(name: "CEPH_REPO", value: env.CEPH_REPO),
+                  string(name: "CEPH_BUILD_BRANCH", value: env.CEPH_BUILD_BRANCH),
+                ]
+              )
+              env.SETUP_BUILD_ID = setup_build.getNumber()
+            } else {
+              env.SETUP_BUILD_ID = last_successful_build_id
+            }
           }
           println "SETUP_BUILD_ID=${env.SETUP_BUILD_ID}"
           env.SETUP_BUILD_URL = new URI([env.JENKINS_URL, "job", env.SETUP_JOB, env.SETUP_BUILD_ID].join("/")).normalize()
