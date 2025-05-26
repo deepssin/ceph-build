@@ -140,11 +140,28 @@ pipeline {
     stage("source distribution") {
       steps {
         script {
-          if (!env.SETUP_BUILD_ID) {
-            def last_successful_build_id = sh(
-              script: "curl -s ${env.JENKINS_URL}job/${env.SETUP_JOB}/lastSuccessfulBuild/buildNumber",
+          if (!env._BUILD_ID) {
+            def buildData = sh(
+              script: "curl -s ${env.JENKINS_URL}job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]",
               returnStdout: true,
             ).trim()
+            def json = new groovy.json.JsonSlurper().parseText(buildData)
+            def last_successful_build_id = null
+
+            for (build in json.builds) {
+                if (build.result != "SUCCESS") continue
+
+                def branchMatched = build.actions.find { action ->
+                    action?.parameters?.find { param ->
+                        param.name == 'BRANCH' && param.value == env.BRANCH
+                    }
+                }
+
+                if (branchMatched) {
+                    last_successful_build_id = build.number
+                    break
+                }
+            }
             if (!last_successful_build_id) {
               def setup_build = build(
                 job: env.SETUP_JOB,
