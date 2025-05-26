@@ -140,7 +140,7 @@ pipeline {
     stage("source distribution") {
       steps {
         script {
-          if (!env._BUILD_ID) {
+          if (!env.SETUP_BUILD_ID) {
             def buildData = sh(
               script: "curl -s ${env.JENKINS_URL}job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]",
               returnStdout: true,
