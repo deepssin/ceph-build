@@ -140,9 +140,12 @@ pipeline {
     stage("source distribution") {
       steps {
         script {
+          echo "BRANCH=${env.BRANCH} env.SETUP_BUILD_ID=${env.SETUP_BUILD_ID} env.SETUP_JOB=${env.SETUP_JOB} env.CEPH_BUILD_BRANCH=${env.CEPH_BUILD_BRANCH}"
           if (!env.SETUP_BUILD_ID) {
             def buildData = sh(
-              script: "curl -s ${env.JENKINS_URL}job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]",
+              script: """curl -s "https://jenkins.ceph.com/job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]" """ +
+                      j"""| q -r '.builds | sort_by(.number) | reverse | .[] | select(.result == "SUCCESS")'""",
+              label: "fetch last successful build data",
               returnStdout: true,
             ).trim()
             def json = new groovy.json.JsonSlurper().parseText(buildData)
