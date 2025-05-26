@@ -143,8 +143,7 @@ pipeline {
           echo "BRANCH=${env.BRANCH} env.SETUP_BUILD_ID=${env.SETUP_BUILD_ID} env.SETUP_JOB=${env.SETUP_JOB} env.CEPH_BUILD_BRANCH=${env.CEPH_BUILD_BRANCH}"
           if (!env.SETUP_BUILD_ID) {
             def buildData = sh(
-              script: """curl -s "https://jenkins.ceph.com/job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]" """ +
-                      j"""| q -r '.builds | sort_by(.number) | reverse | .[] | select(.result == "SUCCESS")'""",
+              script: """curl -s "https://jenkins.ceph.com/job/${env.SETUP_JOB}/api/json?tree=builds[number,result,actions[parameters[name,value]]]" """,
               label: "fetch last successful build data",
               returnStdout: true,
             ).trim()
