@@ -135,22 +135,24 @@ def get_ceph_release_repo_text(base_url) {
 }
 
 @NonCPS
-def find_last_successful_build(json, target_branch) {
-    if (!json?.builds) return null
-    for (build in json.builds) {
+def find_last_successful_build_number(String buildData, String target_branch) {
+    def json = new groovy.json.JsonSlurper().parseText(buildData)
+    def builds = json.builds ?: []
+
+    for (build in builds) {
         if (build.result != "SUCCESS") continue
-        if (!build.actions) continue
-        def matched_branch = build.actions.find { action ->
+
+        def matched = build.actions?.find { action ->
             action?.parameters?.find { param ->
-                param?.name == 'BRANCH' && param?.value == target_branch
+                param.name == 'BRANCH' && param.value == target_branch
             }
         }
-        if (matched_branch) {
-            return build.number
-        }
+
+        if (matched) return build.number?.toString()
     }
     return null
 }
+
 
 pipeline {
   agent any
@@ -166,31 +168,27 @@ pipeline {
                 returnStdout: true
             ).trim()
 
-            def rawJson
-            try {
-              rawJson = new groovy.json.JsonSlurper().parseText(buildData)
-            } catch (Exception e) {
-              error "Failed to parse build data as JSON: ${e}"
-            }
-            def matchedBuildNumber = find_last_successful_build(rawJson, env.BRANCH)
+            def matchedBuildNumber = find_last_successful_build_number(buildData, env.BRANCH)
+            println "Matched build number: ${matchedBuildNumber}"
 
             if (matchedBuildNumber != null) {
                 env.SETUP_BUILD_ID = matchedBuildNumber.toString()
             }
             if (!env.SETUP_BUILD_ID) {
-              def setup_build = build(
-                job: env.SETUP_JOB,
-                parameters: [
-                  string(name: "BRANCH", value: env.BRANCH),
-                  string(name: "FLAVOR", value: env.FLAVOR),
-                  string(name: "SCCACHE", value: env.SCCACHE),
-                  string(name: "DWZ", value: env.DWZ),
-                  // Below are just for ceph-source-dist
-                  string(name: "CEPH_REPO", value: env.CEPH_REPO),
-                  string(name: "CEPH_BUILD_BRANCH", value: env.CEPH_BUILD_BRANCH),
-                ]
-              )
-              env.SETUP_BUILD_ID = setup_build.getNumber()
+              // def setup_build = build(
+              //   job: env.SETUP_JOB,
+              //   parameters: [
+              //     string(name: "BRANCH", value: env.BRANCH),
+              //     string(name: "FLAVOR", value: env.FLAVOR),
+              //     string(name: "SCCACHE", value: env.SCCACHE),
+              //     string(name: "DWZ", value: env.DWZ),
+              //     // Below are just for ceph-source-dist
+              //     string(name: "CEPH_REPO", value: env.CEPH_REPO),
+              //     string(name: "CEPH_BUILD_BRANCH", value: env.CEPH_BUILD_BRANCH),
+              //   ]
+              //)
+              //env.SETUP_BUILD_ID = setup_build.getNumber()
+              echo "No previous successful build found for branch ${env.BRANCH}. Please ensure the setup job has run successfully before this job."
             }
           }
           println "SETUP_BUILD_ID=${env.SETUP_BUILD_ID}"
