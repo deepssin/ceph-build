@@ -143,9 +143,12 @@ def find_last_successful_build_number(String buildData, String target_branch) {
         if (build.result != "SUCCESS") continue
 
         def matched = build.actions?.find { action ->
-            action?.parameters?.find { param ->
-                param.name == 'BRANCH' && param.value == target_branch
-            }
+          def params = action?.parameters
+          if (!params) return false
+
+          params.find { param ->
+              param.name == 'BRANCH' && param.value == target_branch
+          }
         }
 
         if (matched) return build.number?.toString()
