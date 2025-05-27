@@ -135,35 +135,34 @@ def get_ceph_release_repo_text(base_url) {
 }
 
 @NonCPS
-def find_last_successful_build_number(String buildData, String target_branch) {
+def find_last_successful_build_debug(String buildData, String target_branch) {
     def json = new groovy.json.JsonSlurper().parseText(buildData)
     def builds = json.builds ?: []
 
     for (build in builds) {
-        println "Checking build #${build.number} with result: ${build.result}"
-
         if (build.result != "SUCCESS") continue
 
+        def branchParamValue = null
         def matched = build.actions?.find { action ->
             if (!action || !action.containsKey("parameters")) return false
 
             def params = action.parameters
-            def branchParam = params.find { it?.name == 'BRANCH' }
+            def found = params.find { param ->
+                param?.name == 'BRANCH'
+            }
+            if (found) branchParamValue = found.value
 
-            println "Found BRANCH param: ${branchParam?.value} | Comparing with target: ${target_branch}"
-
-            branchParam?.value == target_branch
+            return branchParamValue == target_branch
         }
 
         if (matched) {
-            println "MATCHED build number: ${build.number}"
-            return build.number?.toString()
+            return [matched: true, buildNum: build.number?.toString(), checked: branchParamValue]
         }
     }
 
-    println "No matching build found for target_branch: ${target_branch}"
-    return null
+    return [matched: false, buildNum: null, checked: null]
 }
+
 
 
 
@@ -182,11 +181,13 @@ pipeline {
                 returnStdout: true
             ).trim()
 
-            def matchedBuildNumber = find_last_successful_build_number(buildData, env.BRANCH)
-            println "Matched build number: ${matchedBuildNumber}"
+            def result = find_last_successful_build_debug(buildData, env.BRANCH)
 
-            if (matchedBuildNumber != null) {
-                env.SETUP_BUILD_ID = matchedBuildNumber.toString()
+            echo "Last checked BRANCH value: ${result.checked}"
+            echo "Matched build: ${result.matched}, build number: ${result.buildNum}"
+
+            if (result.matched) {
+                env.SETUP_BUILD_ID = result.buildNum
             }
             if (!env.SETUP_BUILD_ID) {
               // def setup_build = build(
