@@ -136,15 +136,15 @@ def get_ceph_release_repo_text(base_url) {
 
 @NonCPS
 def find_last_successful_build(json, target_branch) {
+    if (!json?.builds) return null
     for (build in json.builds) {
         if (build.result != "SUCCESS") continue
-
+        if (!build.actions) continue
         def matched_branch = build.actions.find { action ->
             action?.parameters?.find { param ->
-                param.name == 'BRANCH' && param.value == target_branch
+                param?.name == 'BRANCH' && param?.value == target_branch
             }
         }
-
         if (matched_branch) {
             return build.number
         }
@@ -167,9 +167,8 @@ pipeline {
             ).trim()
 
             def rawJson = new groovy.json.JsonSlurper().parseText(buildData)
-            def json = [:] + rawJson
+            def matchedBuildNumber = find_last_successful_build(rawJson, env.BRANCH)
 
-            def matchedBuildNumber = find_last_successful_build(json, env.BRANCH)
             if (matchedBuildNumber != null) {
                 env.SETUP_BUILD_ID = matchedBuildNumber.toString()
             }
