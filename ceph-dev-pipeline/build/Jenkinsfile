@@ -181,10 +181,10 @@ pipeline {
                 returnStdout: true
             ).trim()
 
-            def result = find_last_successful_build_debug(buildData, env.BRANCH)
+            def result = find_last_successful_build_debug(buildData, "origin/"+ env.BRANCH)
 
             echo "Last checked BRANCH value: ${result.checked}"
-            echo "Matched build: ${result.matched}, build number: ${result.buildNum}"
+            echo "Matched build: ${result.matched}, build number: ${result.buildNum}" 
 
             if (result.matched) {
                 env.SETUP_BUILD_ID = result.buildNum
