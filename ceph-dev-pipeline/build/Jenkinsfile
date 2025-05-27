@@ -140,21 +140,31 @@ def find_last_successful_build_number(String buildData, String target_branch) {
     def builds = json.builds ?: []
 
     for (build in builds) {
+        println "Checking build #${build.number} with result: ${build.result}"
+
         if (build.result != "SUCCESS") continue
 
         def matched = build.actions?.find { action ->
             if (!action || !action.containsKey("parameters")) return false
 
             def params = action.parameters
-            params.find { param ->
-                param?.name == 'BRANCH' && param?.value == target_branch
-            }
+            def branchParam = params.find { it?.name == 'BRANCH' }
+
+            println "Found BRANCH param: ${branchParam?.value} | Comparing with target: ${target_branch}"
+
+            branchParam?.value == target_branch
         }
 
-        if (matched) return build.number?.toString()
+        if (matched) {
+            println "MATCHED build number: ${build.number}"
+            return build.number?.toString()
+        }
     }
+
+    println "No matching build found for target_branch: ${target_branch}"
     return null
 }
+
 
 
 
