@@ -134,6 +134,24 @@ def get_ceph_release_repo_text(base_url) {
   return text.toString()
 }
 
+@NonCPS
+def find_last_successful_build(json, target_branch) {
+    for (build in json.builds) {
+        if (build.result != "SUCCESS") continue
+
+        def matched_branch = build.actions.find { action ->
+            action?.parameters?.find { param ->
+                param.name == 'BRANCH' && param.value == target_branch
+            }
+        }
+
+        if (matched_branch) {
+            return build
+        }
+    }
+    return null
+}
+
 pipeline {
   agent any
   stages {
@@ -142,29 +160,20 @@ pipeline {
         script {
           echo "BRANCH=${env.BRANCH} env.SETUP_BUILD_ID=${env.SETUP_BUILD_ID} env.SETUP_JOB=${env.SETUP_JOB} env.CEPH_BUILD_BRANCH=${env.CEPH_BUILD_BRANCH}"
           if (!env.SETUP_BUILD_ID) {
-            def buildData = sh(
-              script: "curl -s ${env.JENKINS_URL}/job/${env.SETUP_JOB}/api/json?tree=builds%5Bnumber,result,actions%5Bparameters%5Bname,value%5D%5D%5D",
-              label: "fetch last successful build data",
-              returnStdout: true,
+            def buildData = sh (
+                script: "curl -s ${env.JENKINS_URL}/job/${env.SETUP_JOB}/api/json?tree=builds%5Bnumber,result,actions%5Bparameters%5Bname,value%5D%5D%5D",
+                label: "fetch last successful build data",
+                returnStdout: true
             ).trim()
-            def json = new groovy.json.JsonSlurper().parseText(buildData)
-            def last_successful_build_id = null
 
-            for (build in json.builds) {
-                if (build.result != "SUCCESS") continue
+            def rawJson = new groovy.json.JsonSlurper().parseText(buildData)
+            def json = [:] + rawJson
 
-                def branchMatched = build.actions.find { action ->
-                    action?.parameters?.find { param ->
-                        param.name == 'BRANCH' && param.value == env.BRANCH
-                    }
-                }
-
-                if (branchMatched) {
-                    last_successful_build_id = build.number
-                    break
-                }
+            def matchedBuild = findLastSuccessfulBuild(json, env.BRANCH)
+            if (matchedBuild != null) {
+                env.SETUP_BUILD_ID = matchedBuild.number.toString()
             }
-            if (!last_successful_build_id) {
+            if (!env.SETUP_BUILD_ID) {
               def setup_build = build(
                 job: env.SETUP_JOB,
                 parameters: [
@@ -178,8 +187,6 @@ pipeline {
                 ]
               )
               env.SETUP_BUILD_ID = setup_build.getNumber()
-            } else {
-              env.SETUP_BUILD_ID = last_successful_build_id
             }
           }
           println "SETUP_BUILD_ID=${env.SETUP_BUILD_ID}"
