@@ -169,7 +169,7 @@ pipeline {
             def rawJson = new groovy.json.JsonSlurper().parseText(buildData)
             def json = [:] + rawJson
 
-            def matchedBuild = findLastSuccessfulBuild(json, env.BRANCH)
+            def matchedBuild = find_last_successful_build(json, env.BRANCH)
             if (matchedBuild != null) {
                 env.SETUP_BUILD_ID = matchedBuild.number.toString()
             }
