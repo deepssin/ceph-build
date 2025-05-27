@@ -166,7 +166,12 @@ pipeline {
                 returnStdout: true
             ).trim()
 
-            def rawJson = new groovy.json.JsonSlurper().parseText(buildData)
+            def rawJson
+            try {
+              rawJson = new groovy.json.JsonSlurper().parseText(buildData)
+            } catch (Exception e) {
+              error "Failed to parse build data as JSON: ${e}"
+            }
             def matchedBuildNumber = find_last_successful_build(rawJson, env.BRANCH)
 
             if (matchedBuildNumber != null) {
